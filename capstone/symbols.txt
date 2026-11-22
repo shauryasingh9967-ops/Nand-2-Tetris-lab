@@ -1,0 +1,14 @@
+# symbols.txt — labels and variables discovered by assembler.py
+# (K mod 3 == 0 extra feature)
+# format: <symbol> <address>
+
+[labels]
+DRAW 10
+DRAWLOOP 18
+LOOP 0
+SETBLACK 8
+
+[variables]
+addr 17
+color 16
+i 18

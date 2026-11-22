@@ -1,0 +1,15 @@
+// Computer.hdl — Nand to Tetris, Project 5
+// Shaurya Vinay Singh, Roll No. 2501010296, ETCCNT301
+// The Hack computer: ROM32K (instruction memory) + CPU + Memory
+// (RAM16K + Screen + Keyboard). When reset is 0 the program in ROM
+// executes; when reset is 1 execution restarts from address 0.
+
+CHIP Computer {
+    IN reset;
+
+    PARTS:
+    ROM32K(address=pc, out=instruction);
+    CPU(inM=memOut, instruction=instruction, reset=reset,
+        outM=memIn, writeM=writeM, addressM=addressM, pc=pc);
+    Memory(in=memIn, load=writeM, address=addressM, out=memOut);
+}

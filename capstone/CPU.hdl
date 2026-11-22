@@ -1,0 +1,76 @@
+// CPU.hdl — Nand to Tetris, Project 5
+// Shaurya Vinay Singh, Roll No. 2501010296, ETCCNT301
+// The Hack CPU: A-register, D-register, ALU and program counter.
+// Executes A-instructions (instruction[15] = 0) and C-instructions
+// (instruction[15] = 1) with ALU control bits, writeM / addressM
+// outputs and all jump conditions (JGT, JEQ, JGE, JLT, JNE, JLE, JMP).
+
+CHIP CPU {
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Restart the program (reset=1) or continue (reset=0)
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M?
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // Address of next instruction
+
+    PARTS:
+    // instruction[15] = 0 -> A-instruction; = 1 -> C-instruction
+    Not(in=instruction[15], out=isAInstruction);
+
+    // ---- A-register ----
+    // A-instruction: load the instruction itself.
+    // C-instruction: load the ALU output.
+    Mux16(a=aluOut, b=instruction, sel=isAInstruction, out=aRegIn);
+    // Load A on an A-instruction, or on a C-instruction with d1 = 1.
+    And(a=instruction[15], b=instruction[5], out=cAndD1);
+    Or(a=isAInstruction, b=cAndD1, out=loadA);
+    ARegister(in=aRegIn, load=loadA, out=aRegOut, out[0..14]=addressM);
+
+    // ---- D-register ----
+    // Load D only on a C-instruction with d2 = 1.
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=aluOut, load=loadD, out=dRegOut);
+
+    // ---- ALU ----
+    // Second ALU input: A-register (a-bit = 0) or M (a-bit = 1).
+    Mux16(a=aRegOut, b=inM, sel=instruction[12], out=aluIn);
+    ALU(x=dRegOut, y=aluIn,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=aluOut, zr=isZero, ng=isNegative);
+    // The ALU output is the value written to M.
+    // (outM is wired to aluOut below via a direct connection.)
+
+    // ---- writeM / outM ----
+    // Write to M only on a C-instruction with d3 = 1.
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // ---- Jump logic ----
+    // out > 0  <==>  (not zero) AND (not negative)
+    Not(in=isZero, out=notZero);
+    Not(in=isNegative, out=notNegative);
+    And(a=notZero, b=notNegative, out=isPositive);
+    // j1 (instruction[0]): jump if out > 0
+    And(a=instruction[0], b=isPositive, out=jumpGT);
+    // j2 (instruction[1]): jump if out = 0
+    And(a=instruction[1], b=isZero, out=jumpEQ);
+    // j3 (instruction[2]): jump if out < 0
+    And(a=instruction[2], b=isNegative, out=jumpLT);
+    Or(a=jumpGT, b=jumpEQ, out=jumpGTorEQ);
+    Or(a=jumpGTorEQ, b=jumpLT, out=shouldJump);
+
+    // ---- Program counter ----
+    // Load PC on a C-instruction that jumps, or on reset.
+    And(a=instruction[15], b=shouldJump, out=cAndJump);
+    Or(a=cAndJump, b=reset, out=loadPC);
+    // On reset the PC input is 0; otherwise it is the A-register.
+    Mux16(a=aRegOut, b=false, sel=reset, out=pcIn);
+    PC(in=pcIn, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+
+    // outM carries the ALU output (the value to write to M).
+    // Re-emit aluOut as outM through a pass-through:
+    Mux16(a=aluOut, b=aluOut, sel=false, out=outM);
+}

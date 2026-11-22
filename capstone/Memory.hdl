@@ -1,0 +1,40 @@
+// Memory.hdl — Nand to Tetris, Project 5
+// Shaurya Vinay Singh, Roll No. 2501010296, ETCCNT301
+// The complete address space of the Hack computer's memory (RAM + memory-mapped I/O).
+//   0x0000–0x3FFF (0–16383)     -> RAM16K  (data memory)
+//   0x4000–0x5FFF (16384–24575) -> Screen  (memory-mapped display)
+//   0x6000       (24576)        -> Keyboard (memory-mapped, read-only)
+//
+// Address decoding: the top two address bits (address[13..14]) select the
+// device (sel = 2*address[14] + address[13]):
+//   sel 0 (0x0000–0x1FFF) -> RAM   (lower half)
+//   sel 1 (0x2000–0x3FFF) -> RAM   (upper half)
+//   sel 2 (0x4000–0x5FFF) -> Screen
+//   sel 3 (0x6000–0x7FFF) -> Keyboard
+// RAM therefore spans TWO select values, so the two RAM load signals are
+// combined with an Or gate. The Screen and Keyboard each sit on one value.
+
+CHIP Memory {
+    IN in[16], load, address[15];
+    OUT out[16];
+
+    PARTS:
+    // Route the load signal by the top two address bits.
+    DMux4Way(in=load, sel=address[13..14], a=loadRAMlo, b=loadRAMhi, c=loadScreen, d=loadKBD);
+
+    // RAM spans sel 0 and sel 1: OR the two RAM load signals together.
+    Or(a=loadRAMlo, b=loadRAMhi, out=loadRAM);
+
+    // RAM16K covers 0x0000–0x3FFF; it uses the low 14 address bits.
+    RAM16K(in=in, load=loadRAM, address=address[0..13], out=ramOut);
+
+    // Screen covers 0x4000–0x5FFF; it uses the low 13 address bits.
+    Screen(in=in, load=loadScreen, address=address[0..12], out=screenOut);
+
+    // Keyboard is read-only (address 0x6000); it has no load input.
+    Keyboard(out=kbdOut);
+
+    // Select the output by the same top two address bits.
+    // RAM is selected for both sel 0 and sel 1.
+    Mux4Way16(a=ramOut, b=ramOut, c=screenOut, d=kbdOut, sel=address[13..14], out=out);
+}
